@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["programs/*", "sdk/rs", "cli"]
+members = ["programs/*", "sdk/rs"]
 
 [profile.release]
 overflow-checks = true

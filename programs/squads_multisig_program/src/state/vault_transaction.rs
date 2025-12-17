@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::borsh0_10::get_instance_packed_len;
+use borsh::BorshSerialize;
 
 use crate::errors::*;
 use crate::instructions::{CompiledInstruction, MessageAddressTableLookup, TransactionMessage};
@@ -38,7 +38,7 @@ impl VaultTransaction {
     pub fn size(ephemeral_signers_length: u8, transaction_message: &[u8]) -> Result<usize> {
         let transaction_message: VaultTransactionMessage =
             TransactionMessage::deserialize(&mut &transaction_message[..])?.try_into()?;
-        let message_size = get_instance_packed_len(&transaction_message).unwrap_or_default();
+        let message_size = transaction_message.try_to_vec()?.len();
 
         Ok(
             8 +   // anchor account discriminator

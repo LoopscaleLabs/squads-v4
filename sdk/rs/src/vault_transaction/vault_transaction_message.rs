@@ -4,10 +4,8 @@ use squads_multisig_program::{
 };
 use std::collections::HashMap;
 
-use super::compiled_keys::CompiledKeys;
-use crate::solana_program::address_lookup_table_account::AddressLookupTableAccount;
+use super::compiled_keys::{AddressLookupTableAccount, CompileError, CompiledKeys, LoadedAddresses, MessageAddressTableLookup as CompiledMessageAddressTableLookup};
 use crate::solana_program::instruction::{AccountMeta, Instruction};
-use crate::solana_program::message::{AccountKeys, CompileError};
 use crate::solana_program::pubkey::Pubkey;
 
 #[derive(thiserror::Error, Debug)]
@@ -42,9 +40,17 @@ pub trait VaultTransactionMessageExt {
         }
 
         let (header, static_keys) = compiled_keys.try_into_message_components()?;
-        let dynamic_keys = loaded_addresses_list.into_iter().collect();
-        let account_keys = AccountKeys::new(&static_keys, Some(&dynamic_keys));
-        let instructions = account_keys.try_compile_instructions(instructions)?;
+        let dynamic_keys: Vec<LoadedAddresses> = loaded_addresses_list.into_iter().collect();
+
+        // Build the full list of account keys (static + dynamic)
+        let mut all_account_keys = static_keys.clone();
+        for loaded in &dynamic_keys {
+            all_account_keys.extend(&loaded.writable);
+            all_account_keys.extend(&loaded.readonly);
+        }
+
+        // Compile instructions
+        let instructions = compile_instructions(instructions, &all_account_keys)?;
 
         let num_static_keys: u8 = static_keys
             .len()
@@ -199,4 +205,49 @@ impl VaultTransactionMessageExt for TransactionMessage {
     fn as_transaction_message(&self) -> &TransactionMessage {
         self
     }
+}
+
+// Helper struct for compiled instruction
+#[derive(Debug, Clone)]
+struct SimpleCompiledInstruction {
+    program_id_index: u8,
+    accounts: Vec<u8>,
+    data: Vec<u8>,
+}
+
+// Helper function to compile instructions by finding account indices
+fn compile_instructions(
+    instructions: &[Instruction],
+    account_keys: &[Pubkey],
+) -> Result<Vec<SimpleCompiledInstruction>, CompileError> {
+    instructions
+        .iter()
+        .map(|ix| {
+            let program_id_index = account_keys
+                .iter()
+                .position(|key| key == &ix.program_id)
+                .ok_or(CompileError::UnknownInstructionKey)?
+                .try_into()
+                .map_err(|_| CompileError::AccountIndexOverflow)?;
+
+            let accounts = ix
+                .accounts
+                .iter()
+                .map(|meta| {
+                    account_keys
+                        .iter()
+                        .position(|key| key == &meta.pubkey)
+                        .ok_or(CompileError::UnknownInstructionKey)?
+                        .try_into()
+                        .map_err(|_| CompileError::AccountIndexOverflow)
+                })
+                .collect::<Result<Vec<u8>, CompileError>>()?;
+
+            Ok(SimpleCompiledInstruction {
+                program_id_index,
+                accounts,
+                data: ix.data.clone(),
+            })
+        })
+        .collect()
 }

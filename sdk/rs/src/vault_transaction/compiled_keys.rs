@@ -1,11 +1,41 @@
 use std::collections::BTreeMap;
 
-use crate::solana_program::address_lookup_table_account::AddressLookupTableAccount;
 use crate::solana_program::instruction::Instruction;
-use crate::solana_program::message::v0::{LoadedAddresses, MessageAddressTableLookup};
-use crate::solana_program::message::{CompileError, MessageHeader};
-
 use crate::solana_program::pubkey::Pubkey;
+
+// Types for message compilation (minimal definitions needed since solana_sdk is not available)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AddressLookupTableAccount {
+    pub key: Pubkey,
+    pub addresses: Vec<Pubkey>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MessageAddressTableLookup {
+    pub account_key: Pubkey,
+    pub writable_indexes: Vec<u8>,
+    pub readonly_indexes: Vec<u8>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LoadedAddresses {
+    pub writable: Vec<Pubkey>,
+    pub readonly: Vec<Pubkey>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MessageHeader {
+    pub num_required_signatures: u8,
+    pub num_readonly_signed_accounts: u8,
+    pub num_readonly_unsigned_accounts: u8,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum CompileError {
+    AccountIndexOverflow,
+    AddressTableLookupIndexOverflow,
+    UnknownInstructionKey,
+}
 
 /// A helper struct to collect pubkeys compiled for a set of instructions
 ///

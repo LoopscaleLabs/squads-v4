@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::borsh0_10::get_instance_packed_len;
+use borsh::BorshSerialize;
 
 use super::*;
 
@@ -24,7 +24,7 @@ impl ConfigTransaction {
     pub fn size(actions: &[ConfigAction]) -> usize {
         let actions_size: usize = actions
             .iter()
-            .map(|action| get_instance_packed_len(action).unwrap())
+            .map(|action| action.try_to_vec().unwrap().len())
             .sum();
 
         8 +   // anchor account discriminator
